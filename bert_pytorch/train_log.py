@@ -188,6 +188,7 @@ class Trainer():
         plt.title("epoch vs train loss vs valid loss")
         plt.legend()
         plt.savefig(self.model_dir + "train_valid_loss.png")
+        plt.savefig("/content/logbert/HDFS/train_valid_loss.png")
         plt.show()
         print("plot done")
 
