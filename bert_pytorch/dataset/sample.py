@@ -87,8 +87,28 @@ def generate_train_valid(data_path, window_size=20, adaptive_window=True,
         logkey_seq_pairs += logkeys
         time_seq_pairs += times
 
+    #logkey_seq_pairs = np.array(logkey_seq_pairs)
+    from keras.preprocessing.sequence import pad_sequences
+
+    # Pad sequences to make them the same length
+    max_len = max(len(seq) for seq in logkey_seq_pairs)  # Find the max length
+    logkey_seq_pairs = pad_sequences(logkey_seq_pairs, maxlen=max_len, padding='post', value=0)
+
+    # Convert to NumPy array after padding
     logkey_seq_pairs = np.array(logkey_seq_pairs)
+
+    #time_seq_pairs = np.array(time_seq_pairs)
+    from keras.preprocessing.sequence import pad_sequences
+
+    # Find the maximum sequence length
+    max_time_seq_len = max(len(seq) for seq in time_seq_pairs)
+
+    # Pad sequences to ensure uniform length
+    time_seq_pairs = pad_sequences(time_seq_pairs, maxlen=max_time_seq_len, padding='post', value=0)
+
+    # Convert to a NumPy array after padding
     time_seq_pairs = np.array(time_seq_pairs)
+
 
     logkey_trainset, logkey_validset, time_trainset, time_validset = train_test_split(logkey_seq_pairs,
                                                                                       time_seq_pairs,
