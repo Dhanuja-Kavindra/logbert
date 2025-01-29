@@ -118,8 +118,28 @@ class Predictor():
                 tim_seqs += tim_seq
 
         # sort seq_pairs by seq len
+        #log_seqs = np.array(log_seqs)
+        from keras.preprocessing.sequence import pad_sequences
+
+        # Find the maximum sequence length
+        max_seq_len = max(len(seq) for seq in log_seqs)
+        # Pad sequences to ensure uniform length
+        log_seqs = pad_sequences(log_seqs, maxlen=max_seq_len, padding='post', value=0)
+        # Convert to a NumPy array after padding
         log_seqs = np.array(log_seqs)
+
+        #tim_seqs = np.array(tim_seqs)
+        from keras.preprocessing.sequence import pad_sequences
+
+        # Find the maximum sequence length
+        max_tim_seq_len = max(len(seq) for seq in tim_seqs)
+
+        # Pad sequences to ensure uniform length
+        tim_seqs = pad_sequences(tim_seqs, maxlen=max_tim_seq_len, padding='post', value=0)
+
+        # Convert to a NumPy array after padding
         tim_seqs = np.array(tim_seqs)
+
 
         test_len = list(map(len, log_seqs))
         test_sort_index = np.argsort(-1 * np.array(test_len))
@@ -286,5 +306,75 @@ class Predictor():
         print('Precision: {:.2f}%, Recall: {:.2f}%, F1-measure: {:.2f}%'.format(P, R, F1))
         elapsed_time = time.time() - start_time
         print('elapsed_time: {}'.format(elapsed_time))
+
+        # Visualization
+        self.plot_confusion_matrix(TP, FP, TN, FN)
+        self.plot_roc_curve(test_normal_results, test_abnormal_results)
+        self.plot_metrics_vs_threshold(test_normal_results, test_abnormal_results, params)
+
+    def plot_confusion_matrix(self, TP, FP, TN, FN):
+        # Create confusion matrix
+        cm = np.array([[TP, FN], [FP, TN]])
+        labels = ['Anomaly', 'Normal']
+
+        plt.figure(figsize=(6, 5))
+        sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", xticklabels=labels, yticklabels=labels)
+        plt.title("Confusion Matrix")
+        plt.xlabel("Predicted")
+        plt.ylabel("Actual")
+        plt.savefig("/content/logbert/HDFS/confusion_matrix.png")
+        plt.close()
+
+        def plot_roc_curve(self, test_normal_results, test_abnormal_results):
+            # Compute TPR and FPR for ROC
+            y_true = [0] * len(test_normal_results) + [1] * len(test_abnormal_results)
+            y_scores = [res["undetected_tokens"] for res in test_normal_results] + [res["undetected_tokens"] for res in test_abnormal_results]
+
+            fpr, tpr, _ = roc_curve(y_true, y_scores)
+            roc_auc = auc(fpr, tpr)
+
+            plt.figure(figsize=(8, 6))
+            plt.plot(fpr, tpr, label=f"ROC Curve (AUC = {roc_auc:.2f})")
+            plt.plot([0, 1], [0, 1], "k--", label="Random Guess")
+            plt.title("ROC Curve")
+            plt.xlabel("False Positive Rate")
+            plt.ylabel("True Positive Rate")
+            plt.legend(loc="lower right")
+            plt.savefig("/content/logbert/HDFS/roc_curve.png")
+            plt.close()
+
+        def plot_metrics_vs_threshold(self, test_normal_results, test_abnormal_results, params):
+            thresholds = np.arange(0.0, 1.05, 0.05)
+            precision = []
+            recall = []
+            f1_scores = []
+
+            for th in thresholds:
+                FP = compute_anomaly(test_normal_results, params, th)
+                TP = compute_anomaly(test_abnormal_results, params, th)
+                TN = len(test_normal_results) - FP
+                FN = len(test_abnormal_results) - TP
+
+                if TP + FP == 0 or TP + FN == 0:
+                    continue
+
+                P = 100 * TP / (TP + FP)
+                R = 100 * TP / (TP + FN)
+                F1 = 2 * P * R / (P + R)
+
+                precision.append(P)
+                recall.append(R)
+                f1_scores.append(F1)
+
+            plt.figure(figsize=(8, 6))
+            plt.plot(thresholds, precision, label="Precision")
+            plt.plot(thresholds, recall, label="Recall")
+            plt.plot(thresholds, f1_scores, label="F1-Score")
+            plt.title("Metrics vs Threshold")
+            plt.xlabel("Threshold")
+            plt.ylabel("Percentage")
+            plt.legend(loc="best")
+            plt.savefig("/content/logbert/HDFS/metrics_vs_threshold.png")
+            plt.close()
 
 
