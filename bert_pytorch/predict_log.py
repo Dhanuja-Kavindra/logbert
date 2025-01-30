@@ -7,7 +7,8 @@ import time
 import torch
 from tqdm import tqdm
 from torch.utils.data import DataLoader
-
+from sklearn.metrics import roc_curve, auc
+import os
 from bert_pytorch.dataset import WordVocab
 from bert_pytorch.dataset import LogDataset
 from bert_pytorch.dataset.sample import fixed_window
@@ -118,28 +119,8 @@ class Predictor():
                 tim_seqs += tim_seq
 
         # sort seq_pairs by seq len
-        #log_seqs = np.array(log_seqs)
-        from keras.preprocessing.sequence import pad_sequences
-
-        # Find the maximum sequence length
-        max_seq_len = max(len(seq) for seq in log_seqs)
-        # Pad sequences to ensure uniform length
-        log_seqs = pad_sequences(log_seqs, maxlen=max_seq_len, padding='post', value=0)
-        # Convert to a NumPy array after padding
-        log_seqs = np.array(log_seqs)
-
-        #tim_seqs = np.array(tim_seqs)
-        from keras.preprocessing.sequence import pad_sequences
-
-        # Find the maximum sequence length
-        max_tim_seq_len = max(len(seq) for seq in tim_seqs)
-
-        # Pad sequences to ensure uniform length
-        tim_seqs = pad_sequences(tim_seqs, maxlen=max_tim_seq_len, padding='post', value=0)
-
-        # Convert to a NumPy array after padding
-        tim_seqs = np.array(tim_seqs)
-
+        log_seqs = np.array(log_seqs,dtype=object )
+        tim_seqs = np.array(tim_seqs, dtype=object)
 
         test_len = list(map(len, log_seqs))
         test_sort_index = np.argsort(-1 * np.array(test_len))
@@ -312,20 +293,22 @@ class Predictor():
         self.plot_roc_curve(test_normal_results, test_abnormal_results)
         self.plot_metrics_vs_threshold(test_normal_results, test_abnormal_results, params)
 
+        
+
     def plot_confusion_matrix(self, TP, FP, TN, FN):
-        # Create confusion matrix
-        cm = np.array([[TP, FN], [FP, TN]])
-        labels = ['Anomaly', 'Normal']
+            # Create confusion matrix
+            cm = np.array([[TP, FN], [FP, TN]])
+            labels = ['Anomaly', 'Normal']
 
-        plt.figure(figsize=(6, 5))
-        sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", xticklabels=labels, yticklabels=labels)
-        plt.title("Confusion Matrix")
-        plt.xlabel("Predicted")
-        plt.ylabel("Actual")
-        plt.savefig("/content/logbert/HDFS/confusion_matrix.png")
-        plt.close()
+            plt.figure(figsize=(6, 5))
+            sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", xticklabels=labels, yticklabels=labels)
+            plt.title("Confusion Matrix")
+            plt.xlabel("Predicted")
+            plt.ylabel("Actual")
+            plt.savefig("/content/logbert/HDFS/confusion_matrix.png")
+            plt.close()
 
-        def plot_roc_curve(self, test_normal_results, test_abnormal_results):
+    def plot_roc_curve(self, test_normal_results, test_abnormal_results):
             # Compute TPR and FPR for ROC
             y_true = [0] * len(test_normal_results) + [1] * len(test_abnormal_results)
             y_scores = [res["undetected_tokens"] for res in test_normal_results] + [res["undetected_tokens"] for res in test_abnormal_results]
@@ -343,11 +326,12 @@ class Predictor():
             plt.savefig("/content/logbert/HDFS/roc_curve.png")
             plt.close()
 
-        def plot_metrics_vs_threshold(self, test_normal_results, test_abnormal_results, params):
-            thresholds = np.arange(0.0, 1.05, 0.05)
+    def plot_metrics_vs_threshold(self, test_normal_results, test_abnormal_results, params):
+            thresholds = np.arange(0.0, 1.05, 0.05)  # Ensure consistent threshold range
             precision = []
             recall = []
             f1_scores = []
+            valid_thresholds = []
 
             for th in thresholds:
                 FP = compute_anomaly(test_normal_results, params, th)
@@ -355,26 +339,34 @@ class Predictor():
                 TN = len(test_normal_results) - FP
                 FN = len(test_abnormal_results) - TP
 
-                if TP + FP == 0 or TP + FN == 0:
-                    continue
+                # Avoid division by zero errors
+                P, R, F1 = 0, 0, 0
 
-                P = 100 * TP / (TP + FP)
-                R = 100 * TP / (TP + FN)
-                F1 = 2 * P * R / (P + R)
+                if (TP + FP) > 0:
+                    P = 100 * TP / (TP + FP)
+                if (TP + FN) > 0:
+                    R = 100 * TP / (TP + FN)
+                if (P + R) > 0:
+                    F1 = 2 * P * R / (P + R)
 
                 precision.append(P)
                 recall.append(R)
                 f1_scores.append(F1)
+                valid_thresholds.append(th)
 
-            plt.figure(figsize=(8, 6))
-            plt.plot(thresholds, precision, label="Precision")
-            plt.plot(thresholds, recall, label="Recall")
-            plt.plot(thresholds, f1_scores, label="F1-Score")
-            plt.title("Metrics vs Threshold")
-            plt.xlabel("Threshold")
-            plt.ylabel("Percentage")
-            plt.legend(loc="best")
-            plt.savefig("/content/logbert/HDFS/metrics_vs_threshold.png")
-            plt.close()
+            # Ensure lengths match before plotting
+            if len(valid_thresholds) == len(precision) == len(recall) == len(f1_scores):
+                plt.figure(figsize=(8, 6))
+                plt.plot(valid_thresholds, precision, label="Precision", marker="o")
+                plt.plot(valid_thresholds, recall, label="Recall", marker="s")
+                plt.plot(valid_thresholds, f1_scores, label="F1-score", marker="d")
+                plt.xlabel("Threshold")
+                plt.ylabel("Metric Value (%)")
+                plt.title("Threshold vs Precision/Recall/F1-score")
+                plt.legend()
 
-
+                os.makedirs("/content/logbert/HDFS", exist_ok=True)
+                plt.savefig("/content/logbert/HDFS/metrics_vs_threshold.png")
+                plt.show()
+            else:
+                print("Error: Mismatch in list lengths. No plot generated.")
