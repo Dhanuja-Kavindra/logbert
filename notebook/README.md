@@ -41,7 +41,7 @@ Each notebook corresponds to a different dataset:
 - **HDFS Notebook**: Runs LogBERT on the HDFS dataset.  
 - **BGL Notebook**: Runs LogBERT on the BGL dataset.  
 
-Ensure that the datasets are correctly placed in the `~/.dataset` directory before execution.  
+Ensure that the datasets are correctly placed in the `~/.dataset` directory before execution (follow steps in notebook).  
 
 ---
 
