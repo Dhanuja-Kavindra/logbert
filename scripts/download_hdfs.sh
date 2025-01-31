@@ -9,11 +9,8 @@ else
 fi
 
 cd $file
-#zipfile=HDFS_1.tar.gz?download=1
-#wget https://zenodo.org/record/3227177/files/${zipfile} -P $file
-#tar -xvzf $zipfile
-
 zipfile=HDFS_1.tar.gz?download=1
-wget https://zenodo.org/records/14759417/files/${zipfile} -P $file
+wget https://zenodo.org/record/3227177/files/${zipfile} -P $file
 tar -xvzf $zipfile
+
 
